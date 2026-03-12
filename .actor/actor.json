@@ -3,7 +3,7 @@
     "actorSpecification": 1,
     "name": "pissedconsumer-review-scraper",
     "title": "PissedConsumer Review Scraper",
-    "description": "Extract consumer complaints, reviews, ratings, and company data from PissedConsumer.com. Zero competition on Apify Store.",
+    "description": "Scrape PissedConsumer complaints, reviews, and company data. Extract ratings, complaint text, pros/cons, monetary loss, preferred resolution, and company profiles. Built for reputation monitoring and consumer intelligence.",
     "version": "0.1",
     "buildTag": "latest",
     "meta": {

@@ -1,29 +1,52 @@
 # PissedConsumer Review Scraper
 
-Extract consumer complaints, reviews, ratings, and company data from [PissedConsumer.com](https://www.pissedconsumer.com/).
+Extract consumer complaints, reviews, ratings, and company data from [PissedConsumer.com](https://www.pissedconsumer.com/) — one of the largest consumer complaint platforms in the US with millions of reviews.
 
-PissedConsumer is one of the largest consumer complaint platforms in the US with millions of reviews. This scraper extracts structured review data including ratings, complaint text, author information, pros/cons, monetary loss, and company aggregate data.
+This Actor collects structured review data at scale, including star ratings, complaint text, pros/cons, monetary loss amounts, and preferred resolutions. Perfect for reputation monitoring, competitive intelligence, and consumer sentiment analysis.
 
-## Features
+## What data can you extract from PissedConsumer?
 
-- **Multi-company scraping** — scrape reviews for multiple companies in one run
-- **Company profiles** — aggregate rating, total reviews, star distribution
-- **Rich review data** — rating, title, full text, author, location, verification status, helpful votes
-- **Structured complaint fields** — pros, cons, monetary loss, preferred solution, user recommendation
-- **Pagination support** — handles PissedConsumer's non-standard pagination
-- **Configurable limits** — set max reviews per company
-- **Sort & filter** — sort by helpfulness or date, filter by star rating
+| Field | Example |
+|-------|---------|
+| Star rating | 1-5 |
+| Review title | "Package never arrived" |
+| Full review text | Complete complaint text |
+| Author name | "John D." |
+| Author location | "Houston, TX" |
+| Published date | "2026-03-10" |
+| Verified status | true/false |
+| Helpful votes | 5 |
+| Pros | "Good product quality" |
+| Cons | "Poor delivery service" |
+| Monetary loss | "$150" |
+| Preferred solution | "Full refund" |
+| User recommendation | "Do not use this company" |
+| Company rating | 2.7 |
+| Total reviews | 38,742 |
+| Star distribution | Per-star breakdown |
+| Company website | Official URL |
+
+## How to scrape PissedConsumer reviews
+
+1. Click **Try for free** to open the Actor in Apify Console
+2. Enter one or more company names or URLs (e.g., `amazon` or `https://www.pissedconsumer.com/company/walmart.html`)
+3. Set the maximum number of reviews you want per company
+4. Optionally filter by star rating or change the sort order
+5. Click **Start** and wait for the run to finish
+6. Download your data as JSON, CSV, or Excel — or access it via the Apify API
+
+You can also schedule runs to collect reviews automatically on a daily, weekly, or monthly basis using Apify's built-in scheduling. Connect to Google Sheets, Slack, Zapier, or any webhook to get notified when new data is available.
 
 ## Input
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `companyUrls` | array | Company URLs or slugs (e.g., `amazon`, `https://www.pissedconsumer.com/company/amazon.html`) | required |
-| `maxReviewsPerCompany` | integer | Maximum reviews per company. 0 = unlimited. | 100 |
-| `sortBy` | string | `helpful` or `latest` | `latest` |
+| `companyUrls` | string[] | Company URLs or slugs (e.g., `amazon`, `https://www.pissedconsumer.com/company/amazon.html`) | required |
+| `maxReviewsPerCompany` | number | Maximum reviews to collect per company. Set to 0 for unlimited. | 100 |
+| `sortBy` | string | `helpful` (most helpful first) or `latest` (newest first) | `latest` |
 | `filterByStars` | string | `all`, `1`, `2`, `3`, `4`, or `5` | `all` |
-| `includeCompanyInfo` | boolean | Include company profile as first result | true |
-| `proxyConfig` | object | Proxy settings | Apify Proxy |
+| `includeCompanyInfo` | boolean | Include company profile summary with aggregate stats | true |
+| `proxyConfig` | object | Proxy configuration | Apify Proxy (datacenter) |
 
 ### Example input
 
@@ -39,7 +62,7 @@ PissedConsumer is one of the largest consumer complaint platforms in the US with
 
 ## Output
 
-### Company info (when `includeCompanyInfo` is true)
+### Company profile
 
 ```json
 {
@@ -85,23 +108,45 @@ PissedConsumer is one of the largest consumer complaint platforms in the US with
 }
 ```
 
+## How much does it cost to scrape PissedConsumer?
+
+This Actor uses CheerioCrawler (HTTP requests only, no browser), which keeps costs very low:
+
+- **~$0.50 per 1,000 reviews** with datacenter proxy
+- **~$1.50 per 1,000 reviews** with residential proxy (if needed)
+
+For example, scraping 10,000 reviews from multiple companies would cost approximately $5-15 depending on proxy type. PissedConsumer generally works well with datacenter proxies.
+
+The Apify Free plan includes $5/month of platform credits, enough to scrape thousands of reviews at no cost.
+
 ## Use cases
 
-- **Reputation monitoring** — track customer complaints and satisfaction trends
-- **Competitor analysis** — compare complaint volumes and types across competitors
-- **Customer service intelligence** — identify recurring issues and resolution patterns
-- **Market research** — understand consumer pain points in specific industries
-- **Sentiment analysis** — feed review data into NLP pipelines
+- **Reputation monitoring** — Track customer complaints and satisfaction trends for your brand or competitors. Schedule daily runs to catch new complaints early.
+- **Competitive intelligence** — Compare complaint volumes, types, and resolution patterns across companies in your industry.
+- **Customer service analysis** — Identify recurring issues, common monetary loss amounts, and what resolutions customers actually want.
+- **Market research** — Understand consumer pain points and sentiment in specific industries before entering a market.
+- **Sentiment analysis** — Feed structured review data into NLP pipelines. Each review includes ratings, text, and structured complaint fields for easy processing.
+- **Risk assessment** — Monitor complaint trends for potential partners, vendors, or investment targets.
 
-## Technical details
+## Is it legal to scrape PissedConsumer?
 
-- Uses CheerioCrawler (HTTP-only, no browser needed) for maximum efficiency
-- Extracts data from Schema.org microdata embedded in server-rendered HTML
-- Handles PissedConsumer's non-standard pagination URL pattern
-- Low concurrency (3) to respect the site
+Web scraping of publicly available data is generally legal. PissedConsumer reviews are publicly accessible without requiring login. This Actor only collects data that is visible to any visitor of the website.
 
-## Cost estimate
+For more context on web scraping legality, see [Is web scraping legal?](https://blog.apify.com/is-web-scraping-legal/) on the Apify blog.
 
-With Apify Proxy, expect approximately:
-- ~$0.50 per 1,000 reviews (basic proxy)
-- ~$1.50 per 1,000 reviews (residential proxy, if needed)
+Always review and comply with the terms of service of the target website and applicable data protection regulations (GDPR, CCPA) for your specific use case.
+
+## Tips
+
+- **Start small**: Test with `maxReviewsPerCompany: 10` to verify the output format before running large scrapes.
+- **Use company slugs**: You can pass just the company name (e.g., `amazon`) instead of full URLs.
+- **Filter by stars**: Use `filterByStars` to focus on negative reviews (1-2 stars) for complaint analysis, or positive reviews (4-5 stars) for competitive benchmarking.
+- **Schedule regular runs**: Set up weekly or monthly scrapes to track reputation trends over time.
+
+## Related scrapers
+
+Check out our other review platform scrapers for cross-platform reputation analysis:
+
+- [Trustpilot Review Scraper](https://apify.com/zcag/trustpilot-review-scraper)
+- [SiteJabber Review Scraper](https://apify.com/zcag/sitejabber-review-scraper)
+- [ConsumerAffairs Review Scraper](https://apify.com/zcag/consumeraffairs-review-scraper)
