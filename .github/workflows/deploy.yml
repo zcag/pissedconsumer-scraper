@@ -13,7 +13,7 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.APIFY_TOKEN }}
-      - name: Set categories (does not require T&C)
+      - name: Set publication metadata
         if: always()
         continue-on-error: true
         env:
@@ -21,19 +21,27 @@ jobs:
         run: |
           ACTOR_NAME=$(python3 -c "import json; print(json.load(open('.actor/actor.json'))['name'])")
           USERNAME=$(curl -s -H "Authorization: Bearer $APIFY_TOKEN" https://api.apify.com/v2/users/me | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['data']['username'])")
-          echo "Setting categories for ${USERNAME}~${ACTOR_NAME}..."
+          echo "Setting metadata for ${USERNAME}~${ACTOR_NAME}..."
           RESULT=$(curl -s -X PUT \
             -H "Authorization: Bearer $APIFY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"categories": ["LEAD_GENERATION", "AUTOMATION", "BUSINESS"]}' \
+            -d '{
+              "title": "PissedConsumer Reviews Scraper | Consumer Complaints",
+              "description": "The ONLY PissedConsumer scraper on Apify. Extract consumer complaints, ratings, monetary losses, preferred resolutions, and company profiles. Handles JavaScript-rendered pages. For reputation monitoring and consumer intelligence.",
+              "seoTitle": "PissedConsumer Scraper - Extract Consumer Complaints",
+              "seoDescription": "Scrape PissedConsumer reviews and complaints. Extract ratings, monetary losses, resolutions. The only PissedConsumer scraper available. $2.00 per 1,000 reviews.",
+              "categories": ["LEAD_GENERATION", "AUTOMATION", "BUSINESS"]
+            }' \
             "https://api.apify.com/v2/acts/${USERNAME}~${ACTOR_NAME}")
           echo "$RESULT" | python3 -c "
           import sys,json
           d=json.loads(sys.stdin.read())
           if 'error' in d:
-              print('CATEGORIES ERROR:', d['error'].get('message','unknown'))
+              print('METADATA ERROR:', d['error'].get('message','unknown'))
           else:
-              print('CATEGORIES SET:', d.get('data',{}).get('categories','unknown'))
+              data=d.get('data',{})
+              for f in ['title','description','seoTitle','seoDescription','categories','pictureUrl']:
+                  print(f'{f}: {data.get(f,\"NOT SET\")}')
           "
       - name: Make actor public (needs T&C acceptance in console first)
         id: publish
