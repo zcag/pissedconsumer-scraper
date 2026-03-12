@@ -1,0 +1,17 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "pissedconsumer-review-scraper",
+    "title": "PissedConsumer Review Scraper",
+    "description": "Extract consumer complaints, reviews, ratings, and company data from PissedConsumer.com. Zero competition on Apify Store.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "meta": {
+        "templateId": "ts-crawlee-cheerio"
+    },
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile"
+}
