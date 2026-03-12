@@ -3,8 +3,7 @@ COPY package*.json ./
 RUN npm install --include=dev --audit=false
 COPY . .
 RUN npm run build \
-    && rm -rf src node_modules \
-    && npm install --omit=dev --omit=optional --audit=false \
+    && npm prune --omit=dev \
     && npm cache clean --force
 COPY .actor .actor
 CMD ["node", "dist/main.js"]
