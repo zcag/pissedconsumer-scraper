@@ -15,8 +15,7 @@
                     "publishedDate",
                     "isVerified",
                     "helpfulCount"
-                ],
-                "flatten": []
+                ]
             },
             "display": {
                 "component": "table",
