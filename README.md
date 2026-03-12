@@ -183,3 +183,4 @@ Check out our other review platform scrapers for cross-platform reputation analy
 - [Trustpilot Reviews Scraper](https://apify.com/quasi_grass/trustpilot-review-scraper)
 - [SiteJabber Reviews Scraper](https://apify.com/quasi_grass/sitejabber-review-scraper)
 - [ConsumerAffairs Reviews Scraper](https://apify.com/quasi_grass/consumeraffairs-review-scraper)
+- [Capterra Reviews Scraper](https://apify.com/quasi_grass/capterra-review-scraper)
