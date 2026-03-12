@@ -385,7 +385,12 @@ const crawler = new PlaywrightCrawler({
 
         // Wait for page content to render
         await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(3000);
+        await page.waitForSelector(
+            '[itemprop="review"], [class*="review-card"], [class*="review-item"], [class*="complaint-item"]',
+            { timeout: 10000 },
+        ).catch(() => {
+            // Fallback: content may use different selectors or page may be empty
+        });
 
         log.info(`Processing page ${currentPage} for ${companySlug} (${reviewCount} reviews so far)`);
 
@@ -437,7 +442,8 @@ const crawler = new PlaywrightCrawler({
         const totalPages = await detectTotalPages(page);
         const nextPage = currentPage + 1;
 
-        if (nextPage <= totalPages || (totalPages <= 1 && reviews.length >= 10)) {
+        const MAX_SPECULATIVE_PAGES = 100;
+        if (nextPage <= totalPages || (totalPages <= 1 && reviews.length >= 10 && nextPage <= MAX_SPECULATIVE_PAGES)) {
             const nextUrl = buildReviewPageUrl(companySlug, nextPage);
             await c.addRequests([{
                 url: nextUrl,
