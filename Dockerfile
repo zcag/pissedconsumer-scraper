@@ -1,9 +1,7 @@
 FROM apify/actor-node-playwright-chrome:22
 COPY package*.json ./
-RUN npm install --include=dev --audit=false
-COPY . .
-RUN npm run build \
-    && npm prune --omit=dev \
+RUN npm install --omit=dev --omit=optional --audit=false \
     && npm cache clean --force
+COPY dist dist
 COPY .actor .actor
 CMD ["node", "dist/main.js"]
