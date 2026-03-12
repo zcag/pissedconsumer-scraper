@@ -143,10 +143,27 @@ Always review and comply with the terms of service of the target website and app
 - **Filter by stars**: Use `filterByStars` to focus on negative reviews (1-2 stars) for complaint analysis, or positive reviews (4-5 stars) for competitive benchmarking.
 - **Schedule regular runs**: Set up weekly or monthly scrapes to track reputation trends over time.
 
+## Why this scraper?
+
+- **The only PissedConsumer scraper on Apify** — zero competition. We built it because nobody else did.
+- **Handles JavaScript rendering** — PissedConsumer is a JavaScript SPA. This Actor uses PlaywrightCrawler (headless browser) to render pages, which is why simpler HTTP scrapers can't extract this data.
+- **Rich complaint data** — extracts monetary loss, preferred resolution, pros/cons, and verified status — fields unique to PissedConsumer that no other review platform provides.
+
+## API access
+
+Call this Actor programmatically from any language:
+
+```bash
+curl "https://api.apify.com/v2/acts/quasi_grass~pissedconsumer-review-scraper/run-sync-get-dataset-items?token=YOUR_TOKEN" \
+  -d '{"companyUrls": ["amazon"], "maxReviewsPerCompany": 50}'
+```
+
+Or use the [Apify client](https://docs.apify.com/api/client/js/) for Node.js, Python, or any language. Works with Google Sheets, Zapier, Make, Slack, and 100+ integrations.
+
 ## Related scrapers
 
 Check out our other review platform scrapers for cross-platform reputation analysis:
 
-- [Trustpilot Review Scraper](https://apify.com/zcag/trustpilot-review-scraper)
-- [SiteJabber Review Scraper](https://apify.com/zcag/sitejabber-review-scraper)
-- [ConsumerAffairs Review Scraper](https://apify.com/zcag/consumeraffairs-review-scraper)
+- [Trustpilot Reviews Scraper](https://apify.com/quasi_grass/trustpilot-review-scraper)
+- [SiteJabber Reviews Scraper](https://apify.com/quasi_grass/sitejabber-review-scraper)
+- [ConsumerAffairs Reviews Scraper](https://apify.com/quasi_grass/consumeraffairs-review-scraper)

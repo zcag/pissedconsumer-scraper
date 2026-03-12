@@ -2,8 +2,8 @@
     "$schema": "https://apify.com/schemas/v1/actor.ide.json",
     "actorSpecification": 1,
     "name": "pissedconsumer-review-scraper",
-    "title": "PissedConsumer Review Scraper",
-    "description": "Scrape PissedConsumer complaints, reviews, and company data. Extract ratings, complaint text, pros/cons, monetary loss, preferred resolution, and company profiles. Built for reputation monitoring and consumer intelligence.",
+    "title": "PissedConsumer Reviews Scraper | Consumer Complaints",
+    "description": "The ONLY PissedConsumer scraper on Apify. Extract consumer complaints, ratings, monetary losses, preferred resolutions, and company profiles. Handles JavaScript-rendered pages with PlaywrightCrawler. For reputation monitoring and consumer intelligence.",
     "version": "0.1",
     "buildTag": "latest",
     "meta": {
