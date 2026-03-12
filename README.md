@@ -108,16 +108,21 @@ You can also schedule runs to collect reviews automatically on a daily, weekly, 
 }
 ```
 
-## How much does it cost to scrape PissedConsumer?
+## Pricing
 
-This Actor uses PlaywrightCrawler (headless browser) to handle PissedConsumer's JavaScript-rendered content:
+Pay only for results — no monthly subscription.
 
-- **~$1.50 per 1,000 reviews** with datacenter proxy
-- **~$3.00 per 1,000 reviews** with residential proxy (if needed)
+| Reviews | Cost |
+|---------|------|
+| 1,000 | $2.00 |
+| 5,000 | $10.00 |
+| 10,000 | $20.00 |
 
-For example, scraping 10,000 reviews from multiple companies would cost approximately $15-30 depending on proxy type.
+Platform usage: ~$1.50-3.00 per 1,000 reviews (datacenter vs residential proxy). Uses PlaywrightCrawler (headless browser) to handle PissedConsumer's JavaScript-rendered pages.
 
-The Apify Free plan includes $5/month of platform credits, enough to scrape thousands of reviews at no cost.
+## Try it free
+
+Every Apify account includes free credits. Set `maxReviewsPerCompany: 10` to preview the data format — no payment method required.
 
 ## Use cases
 
@@ -158,7 +163,18 @@ curl "https://api.apify.com/v2/acts/quasi_grass~pissedconsumer-review-scraper/ru
   -d '{"companyUrls": ["amazon"], "maxReviewsPerCompany": 50}'
 ```
 
-Or use the [Apify client](https://docs.apify.com/api/client/js/) for Node.js, Python, or any language. Works with Google Sheets, Zapier, Make, Slack, and 100+ integrations.
+```python
+from apify_client import ApifyClient
+
+client = ApifyClient("YOUR_TOKEN")
+run = client.actor("quasi_grass/pissedconsumer-review-scraper").call(
+    run_input={"companyUrls": ["amazon"], "maxReviewsPerCompany": 50}
+)
+for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+    print(item)
+```
+
+Works with Google Sheets, Zapier, Make, Slack, and 100+ integrations via the [Apify platform](https://docs.apify.com/integrations).
 
 ## Related scrapers
 
