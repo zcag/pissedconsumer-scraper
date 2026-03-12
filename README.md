@@ -110,12 +110,12 @@ You can also schedule runs to collect reviews automatically on a daily, weekly, 
 
 ## How much does it cost to scrape PissedConsumer?
 
-This Actor uses CheerioCrawler (HTTP requests only, no browser), which keeps costs very low:
+This Actor uses PlaywrightCrawler (headless browser) to handle PissedConsumer's JavaScript-rendered content:
 
-- **~$0.50 per 1,000 reviews** with datacenter proxy
-- **~$1.50 per 1,000 reviews** with residential proxy (if needed)
+- **~$1.50 per 1,000 reviews** with datacenter proxy
+- **~$3.00 per 1,000 reviews** with residential proxy (if needed)
 
-For example, scraping 10,000 reviews from multiple companies would cost approximately $5-15 depending on proxy type. PissedConsumer generally works well with datacenter proxies.
+For example, scraping 10,000 reviews from multiple companies would cost approximately $15-30 depending on proxy type.
 
 The Apify Free plan includes $5/month of platform credits, enough to scrape thousands of reviews at no cost.
 

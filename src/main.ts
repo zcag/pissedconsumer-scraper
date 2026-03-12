@@ -1,5 +1,6 @@
-import { CheerioCrawler, Dataset, type CheerioAPI } from '@crawlee/cheerio';
+import { PlaywrightCrawler, Dataset } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
+import type { Page } from 'playwright';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ function extractSlug(input: string): string {
 
     // Handle subdomain URLs: https://amazon.pissedconsumer.com/review.html
     match = input.match(/^https?:\/\/([^.]+)\.pissedconsumer\.com/);
-    if (match) return match[1];
+    if (match && match[1] !== 'www') return match[1];
 
     // Bare slug
     return input.replace(/\.html$/, '').replace(/\//g, '');
@@ -99,7 +100,6 @@ function buildReviewPageUrl(slug: string, page: number): string {
         url = `https://${slug}.pissedconsumer.com/${page}/RT-P.html`;
     }
 
-    // Add query params
     const params = new URLSearchParams();
     if (sortBy === 'latest') params.set('sort', 'latest');
     if (filterByStars !== 'all') params.set('starRating', filterByStars);
@@ -107,173 +107,284 @@ function buildReviewPageUrl(slug: string, page: number): string {
     return qs ? `${url}?${qs}` : url;
 }
 
-// ── Extraction ─────────────────────────────────────────────────────────
+// ── Extraction (runs inside browser context) ────────────────────────────
 
-function extractCompanyInfo($: CheerioAPI, slug: string): CompanyResult | null {
-    const aggregateRating = $('[itemprop="aggregateRating"]');
-    if (aggregateRating.length === 0) return null;
+async function extractCompanyInfo(page: Page, slug: string): Promise<CompanyResult | null> {
+    return page.evaluate((slug) => {
+        const aggregateRating = document.querySelector('[itemprop="aggregateRating"]');
 
-    const ratingValue = parseFloat(aggregateRating.find('[itemprop="ratingValue"]').text().trim()) || 0;
-    const reviewCount = parseInt(aggregateRating.find('meta[itemprop="reviewCount"]').attr('content') || '0') || 0;
-
-    const companyName = $('meta[itemprop="name"]').first().attr('content')
-        || $('[itemprop="itemReviewed"] [itemprop="name"]').first().text().trim()
-        || slug;
-
-    // Star distribution from the filter sidebar
-    const starDistribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
-    $('ol.star_rating_filter li').each((_, el) => {
-        const $el = $(el);
-        const starValue = $el.find('input[name="starRating"]').attr('value');
-        const countText = $el.find('.counter').text().trim();
-        if (starValue && countText) {
-            starDistribution[starValue] = parseInt(countText.replace(/,/g, '')) || 0;
+        // Try JSON-LD first
+        const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (const script of jsonLdScripts) {
+            try {
+                const data = JSON.parse(script.textContent || '{}');
+                const items = Array.isArray(data) ? data : data['@graph'] || [data];
+                for (const item of items) {
+                    if (item.aggregateRating || item['@type'] === 'AggregateRating') {
+                        const agg = item.aggregateRating || item;
+                        return {
+                            type: 'companyInfo' as const,
+                            companyName: item.name || slug,
+                            companySlug: slug,
+                            companyUrl: `https://${slug}.pissedconsumer.com/review.html`,
+                            totalReviews: parseInt(agg.reviewCount) || 0,
+                            averageRating: parseFloat(agg.ratingValue) || 0,
+                            starDistribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+                        };
+                    }
+                }
+            } catch { /* skip */ }
         }
-    });
 
-    return {
-        type: 'companyInfo',
-        companyName,
-        companySlug: slug,
-        companyUrl: `https://${slug}.pissedconsumer.com/review.html`,
-        totalReviews: reviewCount,
-        averageRating: ratingValue,
-        starDistribution,
-    };
-}
+        // Fallback: microdata
+        if (!aggregateRating) return null;
 
-function extractReviews($: CheerioAPI, slug: string, companyName: string): ReviewResult[] {
-    const reviews: ReviewResult[] = [];
+        const ratingEl = aggregateRating.querySelector('[itemprop="ratingValue"]');
+        const countEl = aggregateRating.querySelector('meta[itemprop="reviewCount"]') ||
+                        aggregateRating.querySelector('[itemprop="reviewCount"]');
+        const ratingValue = parseFloat(ratingEl?.textContent?.trim() || '0') || 0;
+        const reviewCount = parseInt(
+            countEl?.getAttribute('content') || countEl?.textContent?.trim() || '0'
+        ) || 0;
 
-    $('div[itemscope][itemprop="review"][itemtype*="schema.org/Review"]').each((_, el) => {
-        const $review = $(el);
+        const nameEl = document.querySelector('meta[itemprop="name"]') ||
+                       document.querySelector('[itemprop="itemReviewed"] [itemprop="name"]');
+        const companyName = nameEl?.getAttribute('content') || nameEl?.textContent?.trim() || slug;
 
-        const title = $review.find('h2[itemprop="headline"], .review-item-title').first().text().trim();
-        const reviewBody = $review.find('[itemprop="reviewBody"]').first().text().trim();
-        const ratingText = $review.find('[itemprop="ratingValue"]').first().text().trim()
-            || $review.find('.stars-wrap').attr('data-active-count') || '0';
-        const rating = parseFloat(ratingText) || 0;
-
-        const dateEl = $review.find('meta[itemprop="datePublished"]');
-        const publishedDate = dateEl.attr('content')
-            || $review.find('time[datetime]').attr('datetime')
-            || '';
-
-        const authorName = $review.find('[itemprop="author"] [itemprop="name"]').first().text().trim()
-            || $review.find('[itemprop="author"]').first().text().trim();
-
-        const locationParts: string[] = [];
-        $review.find('.location-line span').each((_, locEl) => {
-            const loc = $(locEl).text().trim().replace(/,\s*$/, '');
-            if (loc) locationParts.push(loc);
-        });
-        const authorLocation = locationParts.join(', ');
-
-        const isVerified = $review.find('.verified-reviewer, .verified').length > 0;
-
-        const helpfulText = $review.find('.vote-yes .count').first().text().trim();
-        const helpfulCount = parseInt(helpfulText) || 0;
-
-        // Build review URL from review ID
-        const reviewId = $review.attr('data-id') || '';
-        const reviewUrl = reviewId
-            ? `https://${slug}.pissedconsumer.com/review-${reviewId}.html`
-            : '';
-
-        // Extract structured fields (pros, cons, loss, etc.)
-        let pros = '';
-        let cons = '';
-        let monetaryLoss = '';
-        let preferredSolution = '';
-        let userRecommendation = '';
-
-        $review.find('.f-component-info-row, .review-info-row').each((_, rowEl) => {
-            const rowText = $(rowEl).text();
-            if (/pros:/i.test(rowText)) {
-                pros = rowText.replace(/.*pros:\s*/i, '').trim();
-            } else if (/cons:/i.test(rowText)) {
-                cons = rowText.replace(/.*cons:\s*/i, '').trim();
-            } else if (/loss:/i.test(rowText)) {
-                monetaryLoss = rowText.replace(/.*loss:\s*/i, '').trim();
+        // Star distribution from filter sidebar
+        const starDistribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+        document.querySelectorAll('ol.star_rating_filter li').forEach((el) => {
+            const input = el.querySelector('input[name="starRating"]');
+            const counter = el.querySelector('.counter');
+            if (input && counter) {
+                const starValue = input.getAttribute('value');
+                if (starValue) {
+                    starDistribution[starValue] = parseInt(counter.textContent?.trim().replace(/,/g, '') || '0') || 0;
+                }
             }
         });
 
-        $review.find('strong').each((_, strongEl) => {
-            const text = $(strongEl).text();
-            if (/preferred solution/i.test(text)) {
-                preferredSolution = $(strongEl).parent().text().replace(/.*preferred solution:\s*/i, '').trim();
-            } else if (/user.*recommendation/i.test(text)) {
-                userRecommendation = $(strongEl).parent().text().replace(/.*recommendation:\s*/i, '').trim();
-            }
-        });
-
-        reviews.push({
-            type: 'review',
+        return {
+            type: 'companyInfo' as const,
             companyName,
             companySlug: slug,
             companyUrl: `https://${slug}.pissedconsumer.com/review.html`,
-            rating,
-            reviewTitle: title,
-            reviewText: reviewBody,
-            authorName,
-            authorLocation,
-            publishedDate,
-            reviewUrl,
-            isVerified,
-            helpfulCount,
-            pros,
-            cons,
-            monetaryLoss,
-            preferredSolution,
-            userRecommendation,
-        });
-    });
-
-    return reviews;
+            totalReviews: reviewCount,
+            averageRating: ratingValue,
+            starDistribution,
+        };
+    }, slug);
 }
 
-function detectTotalPages($: CheerioAPI): number {
-    let maxPage = 1;
+async function extractReviews(page: Page, slug: string, companyName: string): Promise<ReviewResult[]> {
+    const rawReviews = await page.evaluate((slug) => {
+        const results: any[] = [];
 
-    // Look for pagination links
-    $('a[href*="/RT-P.html"], a[href*="review.html"]').each((_, el) => {
-        const href = $(el).attr('href') || '';
-        // Pattern: /{N}/RT-P.html
-        const match = href.match(/\/(\d+)\/RT-P\.html/);
-        if (match) {
-            const pageNum = parseInt(match[1]);
-            if (pageNum > maxPage) maxPage = pageNum;
+        // Try JSON-LD first
+        const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (const script of jsonLdScripts) {
+            try {
+                const data = JSON.parse(script.textContent || '{}');
+                const items = Array.isArray(data) ? data : data['@graph'] || [data];
+                for (const item of items) {
+                    if (item['@type'] === 'Review') {
+                        results.push({
+                            rating: parseFloat(item.reviewRating?.ratingValue) || 0,
+                            reviewTitle: item.headline || item.name || '',
+                            reviewText: item.reviewBody || item.description || '',
+                            authorName: item.author?.name || '',
+                            authorLocation: '',
+                            publishedDate: item.datePublished || '',
+                            reviewUrl: item.url || '',
+                            isVerified: false,
+                            helpfulCount: 0,
+                            pros: '',
+                            cons: '',
+                            monetaryLoss: '',
+                            preferredSolution: '',
+                            userRecommendation: '',
+                        });
+                    }
+                }
+            } catch { /* skip */ }
         }
-    });
 
-    // Also check text of pagination links
-    $('a.page-link, .pagination a, nav a').each((_, el) => {
-        const text = $(el).text().trim();
-        const num = parseInt(text);
-        if (!isNaN(num) && num > maxPage) maxPage = num;
-    });
+        if (results.length > 0) return results;
 
-    return maxPage;
+        // Fallback: microdata selectors
+        const reviewEls = document.querySelectorAll(
+            'div[itemscope][itemprop="review"][itemtype*="schema.org/Review"], ' +
+            '[itemscope][itemtype*="schema.org/Review"]'
+        );
+
+        for (const el of reviewEls) {
+            const title = (el.querySelector('h2[itemprop="headline"], .review-item-title') as HTMLElement)?.textContent?.trim() || '';
+            const reviewBody = (el.querySelector('[itemprop="reviewBody"]') as HTMLElement)?.textContent?.trim() || '';
+            const ratingText = (el.querySelector('[itemprop="ratingValue"]') as HTMLElement)?.textContent?.trim()
+                || (el.querySelector('.stars-wrap') as HTMLElement)?.getAttribute('data-active-count') || '0';
+            const rating = parseFloat(ratingText) || 0;
+
+            const dateEl = el.querySelector('meta[itemprop="datePublished"]') || el.querySelector('time[datetime]');
+            const publishedDate = dateEl?.getAttribute('content') || dateEl?.getAttribute('datetime') || '';
+
+            const authorName = (el.querySelector('[itemprop="author"] [itemprop="name"]') as HTMLElement)?.textContent?.trim()
+                || (el.querySelector('[itemprop="author"]') as HTMLElement)?.textContent?.trim() || '';
+
+            const locationParts: string[] = [];
+            el.querySelectorAll('.location-line span').forEach((locEl) => {
+                const loc = locEl.textContent?.trim().replace(/,\s*$/, '');
+                if (loc) locationParts.push(loc);
+            });
+
+            const isVerified = el.querySelector('.verified-reviewer, .verified') !== null;
+            const helpfulText = (el.querySelector('.vote-yes .count') as HTMLElement)?.textContent?.trim() || '0';
+
+            const reviewId = el.getAttribute('data-id') || '';
+            const reviewUrl = reviewId ? `https://${slug}.pissedconsumer.com/review-${reviewId}.html` : '';
+
+            let pros = '', cons = '', monetaryLoss = '', preferredSolution = '', userRecommendation = '';
+            el.querySelectorAll('.f-component-info-row, .review-info-row').forEach((rowEl) => {
+                const rowText = rowEl.textContent || '';
+                if (/pros:/i.test(rowText)) pros = rowText.replace(/.*pros:\s*/i, '').trim();
+                else if (/cons:/i.test(rowText)) cons = rowText.replace(/.*cons:\s*/i, '').trim();
+                else if (/loss:/i.test(rowText)) monetaryLoss = rowText.replace(/.*loss:\s*/i, '').trim();
+            });
+            el.querySelectorAll('strong').forEach((strongEl) => {
+                const text = strongEl.textContent || '';
+                if (/preferred solution/i.test(text)) {
+                    preferredSolution = (strongEl.parentElement?.textContent || '').replace(/.*preferred solution:\s*/i, '').trim();
+                } else if (/user.*recommendation/i.test(text)) {
+                    userRecommendation = (strongEl.parentElement?.textContent || '').replace(/.*recommendation:\s*/i, '').trim();
+                }
+            });
+
+            results.push({
+                rating,
+                reviewTitle: title,
+                reviewText: reviewBody,
+                authorName,
+                authorLocation: locationParts.join(', '),
+                publishedDate,
+                reviewUrl,
+                isVerified,
+                helpfulCount: parseInt(helpfulText) || 0,
+                pros,
+                cons,
+                monetaryLoss,
+                preferredSolution,
+                userRecommendation,
+            });
+        }
+
+        // Final fallback: look for common review card patterns
+        if (results.length === 0) {
+            const cards = document.querySelectorAll('[class*="review-card"], [class*="review-item"], [class*="complaint-item"]');
+            for (const card of cards) {
+                const title = (card.querySelector('h2, h3, [class*="title"]') as HTMLElement)?.textContent?.trim() || '';
+                const body = (card.querySelector('[class*="body"], [class*="text"], [class*="content"] p') as HTMLElement)?.textContent?.trim() || '';
+                if (!title && !body) continue;
+
+                const starEls = card.querySelectorAll('[class*="star"][class*="active"], [class*="star"][class*="filled"]');
+                const rating = starEls.length > 0 && starEls.length <= 5 ? starEls.length : 0;
+
+                const dateEl = card.querySelector('time, [class*="date"]');
+                const publishedDate = dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '';
+
+                const authorEl = card.querySelector('[class*="author"], [class*="user"]');
+                const authorName = (authorEl as HTMLElement)?.textContent?.trim() || '';
+
+                results.push({
+                    rating,
+                    reviewTitle: title,
+                    reviewText: body,
+                    authorName,
+                    authorLocation: '',
+                    publishedDate,
+                    reviewUrl: '',
+                    isVerified: false,
+                    helpfulCount: 0,
+                    pros: '',
+                    cons: '',
+                    monetaryLoss: '',
+                    preferredSolution: '',
+                    userRecommendation: '',
+                });
+            }
+        }
+
+        return results;
+    }, slug);
+
+    return rawReviews.map((r) => ({
+        type: 'review' as const,
+        companyName,
+        companySlug: slug,
+        companyUrl: `https://${slug}.pissedconsumer.com/review.html`,
+        ...r,
+    }));
+}
+
+async function detectTotalPages(page: Page): Promise<number> {
+    return page.evaluate(() => {
+        let maxPage = 1;
+
+        // Pagination links with /N/RT-P.html pattern
+        document.querySelectorAll('a[href*="/RT-P.html"], a[href*="review.html"]').forEach((el) => {
+            const href = el.getAttribute('href') || '';
+            const match = href.match(/\/(\d+)\/RT-P\.html/);
+            if (match) {
+                const pageNum = parseInt(match[1]);
+                if (pageNum > maxPage) maxPage = pageNum;
+            }
+        });
+
+        // Text of pagination links
+        document.querySelectorAll('a.page-link, .pagination a, nav a').forEach((el) => {
+            const text = el.textContent?.trim() || '';
+            const num = parseInt(text);
+            if (!isNaN(num) && num > maxPage) maxPage = num;
+        });
+
+        return maxPage;
+    });
 }
 
 // ── Crawler ────────────────────────────────────────────────────────────
 
-const crawler = new CheerioCrawler({
+const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxRequestsPerCrawl: 5000,
     maxConcurrency: 3,
-    requestHandlerTimeoutSecs: 60,
-    requestHandler: async ({ request, $, crawler: c }) => {
+    requestHandlerTimeoutSecs: 120,
+    navigationTimeoutSecs: 60,
+    headless: true,
+    launchContext: {
+        launchOptions: {
+            args: ['--disable-blink-features=AutomationControlled'],
+        },
+    },
+    preNavigationHooks: [
+        async ({ page }) => {
+            await page.addInitScript(() => {
+                Object.defineProperty(navigator, 'webdriver', { get: () => false });
+            });
+        },
+    ],
+    requestHandler: async ({ request, page, crawler: c }) => {
         const userData = request.userData as UserData;
         const { companySlug, companyBaseUrl, currentPage } = userData;
         let { reviewCount, companyInfoEmitted } = userData;
+
+        // Wait for page content to render
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(3000);
 
         log.info(`Processing page ${currentPage} for ${companySlug} (${reviewCount} reviews so far)`);
 
         // Extract company info on first page
         let companyName = companySlug;
         if (includeCompanyInfo && !companyInfoEmitted) {
-            const info = extractCompanyInfo($, companySlug);
+            const info = await extractCompanyInfo(page, companySlug);
             if (info) {
                 await Dataset.pushData(info);
                 companyInfoEmitted = true;
@@ -281,13 +392,16 @@ const crawler = new CheerioCrawler({
                 log.info(`Emitted company info for ${companyName}: ${info.averageRating}★, ${info.totalReviews} reviews`);
             }
         } else {
-            // Try to get company name even if we don't emit info
-            const nameEl = $('meta[itemprop="name"]').first().attr('content');
-            if (nameEl) companyName = nameEl;
+            // Try to get company name
+            const nameFromPage = await page.evaluate(() => {
+                const el = document.querySelector('meta[itemprop="name"]');
+                return el?.getAttribute('content') || '';
+            });
+            if (nameFromPage) companyName = nameFromPage;
         }
 
         // Extract reviews
-        let reviews = extractReviews($, companySlug, companyName);
+        let reviews = await extractReviews(page, companySlug, companyName);
 
         if (reviews.length === 0) {
             log.info(`No reviews found on page ${currentPage} for ${companySlug}. Stopping.`);
@@ -312,11 +426,10 @@ const crawler = new CheerioCrawler({
         }
 
         // Detect pagination and enqueue next page
-        const totalPages = detectTotalPages($);
+        const totalPages = await detectTotalPages(page);
         const nextPage = currentPage + 1;
 
         if (nextPage <= totalPages || (totalPages <= 1 && reviews.length >= 10)) {
-            // Either we know there are more pages, or we got a full page and should try next
             const nextUrl = buildReviewPageUrl(companySlug, nextPage);
             await c.addRequests([{
                 url: nextUrl,

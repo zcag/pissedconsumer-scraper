@@ -7,7 +7,7 @@
     "version": "0.1",
     "buildTag": "latest",
     "meta": {
-        "templateId": "ts-crawlee-cheerio"
+        "templateId": "ts-crawlee-playwright-chrome"
     },
     "input": "./input_schema.json",
     "storages": {
