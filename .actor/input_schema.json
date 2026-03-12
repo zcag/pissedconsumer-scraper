@@ -7,7 +7,7 @@
         "companyUrls": {
             "title": "Company URLs or slugs",
             "type": "array",
-            "description": "PissedConsumer company URLs (e.g. https://www.pissedconsumer.com/company/amazon.html or https://amazon.pissedconsumer.com/review.html) or just company slugs (e.g. amazon).",
+            "description": "PissedConsumer company URLs (e.g. https://amazon.pissedconsumer.com/review.html) or just company slugs (e.g. amazon).",
             "editor": "stringList",
             "prefill": ["amazon"]
         },

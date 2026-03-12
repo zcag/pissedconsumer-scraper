@@ -76,16 +76,24 @@ const proxyConfiguration = await Actor.createProxyConfiguration(proxyConfig);
 // ── URL helpers ────────────────────────────────────────────────────────
 
 function extractSlug(input: string): string {
-    // Handle full URLs: https://www.pissedconsumer.com/company/amazon.html
-    let match = input.match(/pissedconsumer\.com\/company\/([^/.]+)/);
-    if (match) return match[1];
-
     // Handle subdomain URLs: https://amazon.pissedconsumer.com/review.html
-    match = input.match(/^https?:\/\/([^.]+)\.pissedconsumer\.com/);
+    let match = input.match(/^https?:\/\/([^.]+)\.pissedconsumer\.com/);
     if (match && match[1] !== 'www') return match[1];
 
+    // Handle /company/ path: https://www.pissedconsumer.com/company/amazon.html
+    match = input.match(/pissedconsumer\.com\/company\/([^/.]+)/);
+    if (match) return match[1];
+
+    // Handle old path-based URLs: https://www.pissedconsumer.com/{slug}/RT-F.html
+    match = input.match(/pissedconsumer\.com\/([^/]+)\/(?:RT-[A-Z]|review|reviews|complaints)/i);
+    if (match) return match[1].replace(/-\d{6,}$/, ''); // strip numeric DB IDs like -201712110
+
+    // Handle path without subpage: https://www.pissedconsumer.com/{slug}.html
+    match = input.match(/pissedconsumer\.com\/([^/.]+)\.html/);
+    if (match) return match[1];
+
     // Bare slug
-    return input.replace(/\.html$/, '').replace(/\//g, '');
+    return input.trim().replace(/\.html$/, '').replace(/\//g, '');
 }
 
 function buildReviewPageUrl(slug: string, page: number): string {

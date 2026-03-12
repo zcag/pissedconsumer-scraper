@@ -29,7 +29,7 @@ This Actor collects structured review data at scale, including star ratings, com
 ## How to scrape PissedConsumer reviews
 
 1. Click **Try for free** to open the Actor in Apify Console
-2. Enter one or more company names or URLs (e.g., `amazon` or `https://www.pissedconsumer.com/company/walmart.html`)
+2. Enter one or more company names or URLs (e.g., `amazon` or `https://amazon.pissedconsumer.com/review.html`)
 3. Set the maximum number of reviews you want per company
 4. Optionally filter by star rating or change the sort order
 5. Click **Start** and wait for the run to finish
@@ -41,7 +41,7 @@ You can also schedule runs to collect reviews automatically on a daily, weekly, 
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `companyUrls` | string[] | Company URLs or slugs (e.g., `amazon`, `https://www.pissedconsumer.com/company/amazon.html`) | required |
+| `companyUrls` | string[] | Company URLs or slugs (e.g., `amazon`, `https://amazon.pissedconsumer.com/review.html`) | required |
 | `maxReviewsPerCompany` | number | Maximum reviews to collect per company. Set to 0 for unlimited. | 100 |
 | `sortBy` | string | `helpful` (most helpful first) or `latest` (newest first) | `latest` |
 | `filterByStars` | string | `all`, `1`, `2`, `3`, `4`, or `5` | `all` |
